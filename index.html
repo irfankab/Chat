@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Group Chat</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        #chat-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-top: 20px;
+        }
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+        }
+        .message .user-name {
+            font-weight: bold;
+            color: #2b5876;
+        }
+        .message .timestamp {
+            font-size: 0.8em;
+            color: #666;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #2b5876;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #1a3f5c;
+        }
+        #name-input {
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="name-input">
+        <h2>Enter your name to join the chat</h2>
+        <input type="text" id="user-name" placeholder="Your name">
+        <button onclick="joinChat()">Join Chat</button>
+    </div>
+
+    <div id="chat-container" style="display: none;">
+        <h2>Group Chat</h2>
+        <div id="messages"></div>
+        <input type="text" id="message-input" placeholder="Type your message...">
+        <button onclick="sendMessage()">Send</button>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://hcyufvewihabryohsxlx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjeXVmdmV3aWhhYnJ5b2hzeGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgxNTA5NTEsImV4cCI6MjA1MzcyNjk1MX0.vKzq0vjKsOmFenRHKh6RMscJrg3Md4Hz5vjn2STVJE0';
+        
+        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+        let userName = '';
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        let channel;
+
+        function joinChat() {
+            userName = document.getElementById('user-name').value.trim();
+            if (userName) {
+                document.getElementById('name-input').style.display = 'none';
+                document.getElementById('chat-container').style.display = 'block';
+                subscribeToMessages();
+                loadExistingMessages();
+            }
+        }
+
+        async function loadExistingMessages() {
+            const { data, error } = await supabaseClient
+                .from('messages')
+                .select('*')
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                console.error('Error loading messages:', error);
+                return;
+            }
+
+            messagesDiv.innerHTML = '';
+            
+            const fragment = document.createDocumentFragment();
+            data.forEach(message => {
+                const messageElement = createMessageElement(message);
+                fragment.appendChild(messageElement);
+            });
+            messagesDiv.appendChild(fragment);
+            
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function subscribeToMessages() {
+            if (channel) {
+                channel.unsubscribe();
+            }
+
+            channel = supabaseClient
+                .channel('messages')
+                .on('postgres_changes', 
+                    { event: 'INSERT', schema: 'public', table: 'messages' },
+                    payload => {
+                        const messageElement = createMessageElement(payload.new);
+                        messagesDiv.appendChild(messageElement);
+                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+                    }
+                )
+                .subscribe();
+        }
+
+        async function sendMessage() {
+            const content = messageInput.value.trim();
+            if (!content) return;
+
+            // Clear input and show message immediately
+            messageInput.value = '';
+            const optimisticMessage = {
+                content,
+                user_name: userName,
+                created_at: new Date().toISOString()
+            };
+            const messageElement = createMessageElement(optimisticMessage);
+            messagesDiv.appendChild(messageElement);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+            // Send to Supabase
+            const { error } = await supabaseClient
+                .from('messages')
+                .insert([
+                    { content, user_name: userName }
+                ]);
+
+            if (error) {
+                console.error('Error sending message:', error);
+                messageElement.style.backgroundColor = '#ffebee';
+                return;
+            }
+        }
+
+        function createMessageElement(message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            
+            const timestamp = new Date(message.created_at).toLocaleTimeString();
+            
+            messageElement.innerHTML = `
+                <span class="user-name">${message.user_name}</span>
+                <span class="timestamp">${timestamp}</span>
+                <div>${message.content}</div>
+            `;
+            
+            return messageElement;
+        }
+
+        // Allow sending message with Enter key
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
