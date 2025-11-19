@@ -1,196 +1,509 @@
-<!DOCTYPE html>
+                    <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Group Chat</title>
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <title>EVEAGLE | Archive of Bengal</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400;1,500&family=Pinyon+Script&family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <!-- Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/studio-freight/lenis@1.0.29/bundled/lenis.min.js"></script>
+
     <style>
+        :root {
+            --bg-void: #0F0F0F;        /* Deep Black */
+            --bg-cream: #E0DCD3;       /* Archive Paper */
+            --copper: #C17C3A;         /* Rich Copper/Leather */
+            --ink: #050505;
+            
+            --font-head: 'Cinzel', serif;
+            --font-body: 'Cormorant Garamond', serif;
+            --font-script: 'Pinyon Script', cursive;
+            --font-tech: 'Montserrat', sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f0f2f5;
+            background-color: var(--bg-cream);
+            color: var(--ink);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            cursor: none;
         }
-        #chat-container {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            padding: 20px;
-            margin-top: 20px;
+
+        /* --- PRELOADER --- */
+        .preloader {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-void);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: var(--bg-cream);
         }
-        #messages {
-            height: 400px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-            padding: 10px;
-            margin-bottom: 20px;
-            border-radius: 4px;
+        .loader-quote {
+            font-family: var(--font-script);
+            font-size: 2.5rem;
+            color: var(--copper);
+            margin-bottom: 1rem;
+            opacity: 0;
         }
-        .message {
-            margin-bottom: 10px;
-            padding: 8px;
-            background: #e9ecef;
-            border-radius: 4px;
+        .loader-wrap { overflow: hidden; }
+        .loader-text {
+            font-family: var(--font-head);
+            font-size: 5rem;
+            letter-spacing: 0.5rem;
+            transform: translateY(100%);
+            color: var(--bg-cream);
         }
-        .message .user-name {
-            font-weight: bold;
-            color: #2b5876;
+
+        /* --- UTILS --- */
+        .noise {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://grainy-gradients.vercel.app/noise.svg');
+            opacity: 0.05;
+            pointer-events: none;
+            z-index: 9000;
         }
-        .message .timestamp {
-            font-size: 0.8em;
-            color: #666;
+
+        .cursor {
+            position: fixed;
+            top: 0; left: 0;
+            width: 20px; height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10000;
+            mix-blend-mode: difference;
+            transition: width 0.3s, height 0.3s;
         }
-        input[type="text"] {
+        .cursor.grow { width: 60px; height: 60px; background: var(--bg-cream); }
+
+        /* --- NAV ELEMENTS --- */
+        .nav-wrapper {
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 6000;
+            pointer-events: none;
+            width: 100%; height: 100vh;
+        }
+
+        /* The Background Shape (Cream Bar) */
+        .nav-bg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 80px; /* Initial Sidebar Width */
+            height: 100vh; /* Initial Sidebar Height */
+            background: var(--bg-cream);
+            border-right: 1px solid rgba(0,0,0,0.1);
+            border-bottom: 0px solid rgba(0,0,0,0.1);
+            pointer-events: auto;
+            transform-origin: top left;
+            z-index: 6001;
+        }
+
+        /* 
+           THE VISIBILITY FIX:
+           1. Color set to Cream/White (#E0DCD3).
+           2. Mix-blend-mode set to DIFFERENCE.
+           
+           Result: 
+           - On Black Background -> Shows White.
+           - On Cream Background -> Shows Black.
+        */
+        
+        .menu-icon {
+            position: fixed;
+            top: 3rem; left: 25px;
+            width: 30px; display: flex; flex-direction: column; gap: 6px;
+            cursor: pointer; 
+            z-index: 6005; /* Must be above nav-bg */
+            pointer-events: auto;
+            mix-blend-mode: difference; /* The Magic Fix */
+        }
+        .menu-line { width: 100%; height: 1px; background: var(--bg-cream); transition: 0.3s; } /* White lines */
+        
+        .nav-logo {
+            position: fixed;
+            top: 50%; left: 40px; /* Center of sidebar */
+            transform: translate(-50%, -50%) rotate(-90deg);
+            font-family: var(--font-head);
+            font-weight: 800;
+            letter-spacing: 0.3em;
+            font-size: 1.2rem;
+            white-space: nowrap;
+            z-index: 6005; /* Must be above nav-bg */
+            pointer-events: auto;
+            color: var(--bg-cream); /* White Text */
+            mix-blend-mode: difference; /* The Magic Fix */
+        }
+
+        .nav-coords {
+            position: fixed;
+            bottom: 3rem; left: 40px;
+            transform: translateX(-50%) rotate(-90deg);
+            font-family: var(--font-tech);
+            font-size: 0.6rem;
+            color: var(--bg-cream); /* White Text */
+            letter-spacing: 2px;
+            white-space: nowrap;
+            z-index: 6005;
+            pointer-events: auto;
+            mix-blend-mode: difference;
+        }
+
+        /* Menu Active State */
+        .menu-icon.active .menu-line:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        .menu-icon.active .menu-line:nth-child(2) { opacity: 0; }
+        .menu-icon.active .menu-line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+        /* --- MENU OVERLAY --- */
+        .menu-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100vh;
+            background: #080808;
+            z-index: 5500;
+            transform: translateY(-100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+        }
+        .menu-link {
+            font-family: var(--font-head);
+            font-size: 4vw;
+            color: #333;
+            text-decoration: none;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+        .menu-link:hover { color: var(--copper); font-style: italic; letter-spacing: 5px; }
+
+        /* --- CONTENT --- */
+        .content-shift {
+            margin-left: 80px;
+            width: calc(100% - 80px);
+        }
+
+        /* --- HERO --- */
+        .hero {
+            height: 100vh;
             width: 100%;
-            padding: 8px;
-            margin: 5px 0;
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+            background: var(--bg-void);
+            color: var(--bg-cream);
         }
-        button {
-            background: #2b5876;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
+        .hero-bg {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0.3;
+            filter: grayscale(100%) contrast(1.2);
+            transform: scale(1.3);
         }
-        button:hover {
-            background: #1a3f5c;
+        .hero-content {
+            position: relative; z-index: 2; text-align: center; mix-blend-mode: difference;
         }
-        #name-input {
-            margin-bottom: 20px;
+        .hero-sur {
+            font-family: var(--font-script); font-size: 3rem; color: var(--copper);
+            margin-bottom: 1rem; opacity: 0; transform: translateY(20px);
         }
+        .hero-main {
+            font-family: var(--font-head); font-size: 13vw; line-height: 0.85;
+            text-transform: uppercase; overflow: hidden; margin: 0;
+        }
+        .hero-main span { display: block; transform: translateY(100%); }
+        .hero-sub {
+            margin-top: 2rem; font-family: var(--font-tech); letter-spacing: 0.5em;
+            font-size: 0.7rem; text-transform: uppercase; opacity: 0;
+        }
+
+        /* --- MANIFESTO --- */
+        .manifesto { padding: 12rem 10vw; background: var(--bg-cream); }
+        .manifesto p {
+            font-size: 3.5rem; line-height: 1.2; font-family: var(--font-head);
+            color: rgba(0,0,0,0.05);
+        }
+        .word { color: var(--ink); opacity: 0; transition: 0.2s; }
+
+        /* --- STACKED CARDS --- */
+        .stack-section { padding: 5rem 10vw 15rem 10vw; background: #D6D1C6; }
+        .stack-title {
+            text-align: center; margin-bottom: 6rem; font-family: var(--font-script);
+            font-size: 4rem; color: var(--copper);
+        }
+        .card-wrapper { max-width: 800px; margin: 0 auto; position: relative; }
+        .product-card {
+            position: sticky; top: 15vh; height: 75vh;
+            background: var(--bg-void); color: var(--bg-cream);
+            margin-bottom: 5vh; display: flex; flex-direction: column;
+            box-shadow: 0 -10px 40px rgba(0,0,0,0.3);
+            transform-origin: center top; border: 1px solid rgba(255,255,255,0.05);
+        }
+        .pc-img-box {
+            flex: 1.4; width: 100%; position: relative; overflow: hidden; background: #1a1a1a;
+        }
+        .pc-img {
+            width: 100%; height: 100%; object-fit: cover; object-position: center;
+            transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1); filter: contrast(1.1);
+        }
+        .product-card:hover .pc-img { transform: scale(1.05); }
+        .pc-info {
+            flex: 1; padding: 3rem; display: flex; flex-direction: column;
+            justify-content: space-between; background: var(--bg-void);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .pc-meta {
+            display: flex; justify-content: space-between; font-family: var(--font-tech);
+            color: var(--copper); font-size: 0.7rem; letter-spacing: 2px; text-transform: uppercase;
+        }
+        .pc-title { font-family: var(--font-head); font-size: 3rem; margin-top: 1rem; line-height: 1; }
+        .pc-details { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 2rem; }
+        .pc-desc { font-family: var(--font-body); font-size: 1.1rem; color: #999; max-width: 60%; line-height: 1.4; }
+        .pc-price { font-family: var(--font-script); font-size: 2.5rem; color: var(--bg-cream); }
+
+        /* --- ARCHIVE --- */
+        .archive-sec { padding: 8rem 10vw; background: var(--bg-cream); }
+        .archive-row {
+            border-top: 1px solid rgba(0,0,0,0.1); padding: 2.5rem 0;
+            display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; transition: padding 0.3s;
+        }
+        .archive-row:last-child { border-bottom: 1px solid rgba(0,0,0,0.1); }
+        .archive-row:hover { padding-left: 2rem; }
+        .ar-title { font-family: var(--font-head); font-size: 2.5rem; text-transform: uppercase; }
+        .ar-year { font-family: var(--font-tech); color: var(--copper); letter-spacing: 1px; }
+
+        .float-img {
+            position: fixed; top: 0; left: 0; width: 250px; height: 350px;
+            background-size: cover; background-position: center;
+            pointer-events: none; opacity: 0; z-index: 8000;
+            transform: translate(-50%, -50%) scale(0.8);
+            transition: opacity 0.3s, transform 0.4s; border: 1px solid var(--ink);
+        }
+
+        footer { background: var(--ink); color: var(--bg-cream); padding: 4rem; text-align: center; }
+
     </style>
 </head>
 <body>
-    <div id="name-input">
-        <h2>Enter your name to join the chat</h2>
-        <input type="text" id="user-name" placeholder="Your name">
-        <button onclick="joinChat()">Join Chat</button>
+
+    <div class="noise"></div>
+    <div class="cursor"></div>
+    <div class="float-img"></div>
+
+    <!-- PRELOADER -->
+    <div class="preloader">
+        <div class="loader-quote">"The Art of Silence"</div>
+        <div class="loader-wrap">
+            <div class="loader-text">EVEAGLE</div>
+        </div>
     </div>
 
-    <div id="chat-container" style="display: none;">
-        <h2>Group Chat</h2>
-        <div id="messages"></div>
-        <input type="text" id="message-input" placeholder="Type your message...">
-        <button onclick="sendMessage()">Send</button>
+    <!-- MENU OVERLAY -->
+    <div class="menu-overlay">
+        <a href="#" class="menu-link">The Collection</a>
+        <a href="#" class="menu-link">Bespoke Service</a>
+        <a href="#" class="menu-link">Our Heritage</a>
+        <a href="#" class="menu-link">Contact</a>
+    </div>
+
+    <!-- DYNAMIC NAVIGATION -->
+    <div class="nav-wrapper">
+        <!-- Cream Background Bar -->
+        <div class="nav-bg"></div>
+        
+        <!-- Menu Icon (White w/ Diff Blend) -->
+        <div class="menu-icon hover-trig">
+            <div class="menu-line"></div>
+            <div class="menu-line"></div>
+            <div class="menu-line"></div>
+        </div>
+        
+        <!-- Logo (White w/ Diff Blend) -->
+        <div class="nav-logo">EVEAGLE</div>
+        
+        <!-- Coords (White w/ Diff Blend) -->
+        <div class="nav-coords">DHAKA</div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content-shift">
+        <header class="hero">
+            <img src="https://images.unsplash.com/photo-1533867617858-e7b97e0605df?q=80&w=2670&auto=format&fit=crop" class="hero-bg" alt="Texture">
+            <div class="hero-content">
+                <h1 class="hero-main"><span>EVEAGLE</span></h1>
+                <div class="hero-sur">The Bengal Legacy</div>
+                <div class="hero-sub">Est. 1985 • Hazaribagh District</div>
+            </div>
+        </header>
+
+        <section class="manifesto">
+            <p>
+                <span class="word">True</span> <span class="word">luxury</span> <span class="word">is</span> <span class="word">quiet.</span>
+                <span class="word">It</span> <span class="word">is</span> <span class="word">crafted</span> <span class="word">in</span>
+                <span class="word">the</span> <span class="word">historic</span> <span class="word">tanneries</span> <span class="word">of</span>
+                <span class="word">Dhaka.</span> <span class="word">No</span> <span class="word">synthetics.</span>
+                <span class="word">No</span> <span class="word">compromise.</span> <span class="word">Only</span>
+                <span class="word">Heritage.</span>
+            </p>
+        </section>
+
+        <section class="stack-section">
+            <div class="stack-title">The Selection</div>
+            <div class="card-wrapper">
+                <div class="product-card">
+                    <div class="pc-img-box"><img src="https://images.unsplash.com/photo-1614252235316-8c857d38b5f4?q=80&w=2660&auto=format&fit=crop" class="pc-img" alt="Oxford"></div>
+                    <div class="pc-info">
+                        <div class="pc-meta"><span>01 / Formal</span><span>Calfskin</span></div>
+                        <h2 class="pc-title">The Gulshan<br>Oxford</h2>
+                        <div class="pc-details"><p class="pc-desc">The definitive cap-toe. Hand-finished crust leather. Elegant closed lacing.</p><div class="pc-price">৳ 18,500</div></div>
+                    </div>
+                </div>
+                <div class="product-card">
+                    <div class="pc-img-box"><img src="https://images.unsplash.com/photo-1628253747716-0c4f5c90fdda?q=80&w=2574&auto=format&fit=crop" class="pc-img" alt="Monk"></div>
+                    <div class="pc-info">
+                        <div class="pc-meta"><span>02 / Strap</span><span>Brass</span></div>
+                        <h2 class="pc-title">The Sylhet<br>Monk</h2>
+                        <div class="pc-details"><p class="pc-desc">Double buckle strap. A bridge between strict formal and modern flair.</p><div class="pc-price">৳ 21,000</div></div>
+                    </div>
+                </div>
+                <div class="product-card">
+                    <div class="pc-img-box"><img src="https://images.unsplash.com/photo-1478683855177-45f469b1f6ac?q=80&w=2670&auto=format&fit=crop" class="pc-img" alt="Loafer"></div>
+                    <div class="pc-info">
+                        <div class="pc-meta"><span>03 / Leisure</span><span>Slip-on</span></div>
+                        <h2 class="pc-title">The Banani<br>Loafer</h2>
+                        <div class="pc-details"><p class="pc-desc">Classic penny silhouette. Unlined for breathability in the Bengal heat.</p><div class="pc-price">৳ 16,000</div></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="archive-sec">
+            <div style="font-family: var(--font-tech); margin-bottom: 2rem; letter-spacing: 2px; color: #888;">ARCHIVE</div>
+            <div class="archive-row hover-trig" data-img="https://images.unsplash.com/photo-1614771189002-1b9b88c0231f?q=80&w=2574&auto=format&fit=crop"><div class="ar-title">Wholecut Oxford</div><div class="ar-year">2023 Ed.</div></div>
+            <div class="archive-row hover-trig" data-img="https://images.unsplash.com/photo-1549298916-b41d501d3772?q=80&w=2224&auto=format&fit=crop"><div class="ar-title">Sovereign Derby</div><div class="ar-year">Restocked</div></div>
+            <div class="archive-row hover-trig" data-img="https://images.unsplash.com/photo-1638508262320-a20752665d9d?q=80&w=2574&auto=format&fit=crop"><div class="ar-title">Heritage Chelsea</div><div class="ar-year">Winter</div></div>
+        </section>
+
+        <footer>
+            <div style="font-family: var(--font-script); font-size: 3rem; color: var(--copper); margin-bottom: 1rem;">Eveagle</div>
+            <p style="font-family: var(--font-tech); font-size: 0.7rem; letter-spacing: 1px;">&copy; 2024 LUXURY HOLDINGS BANGLADESH</p>
+        </footer>
     </div>
 
     <script>
-        const supabaseUrl = 'https://hcyufvewihabryohsxlx.supabase.co';
-        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjeXVmdmV3aWhhYnJ5b2hzeGx4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzgxNTA5NTEsImV4cCI6MjA1MzcyNjk1MX0.vKzq0vjKsOmFenRHKh6RMscJrg3Md4Hz5vjn2STVJE0';
-        
-        const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+        // 1. Init Lenis
+        const lenis = new Lenis({ duration: 1.2, easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)), smooth: true });
+        function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
+        requestAnimationFrame(raf);
 
-        let userName = '';
-        const messagesDiv = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        let channel;
+        gsap.registerPlugin(ScrollTrigger);
 
-        function joinChat() {
-            userName = document.getElementById('user-name').value.trim();
-            if (userName) {
-                document.getElementById('name-input').style.display = 'none';
-                document.getElementById('chat-container').style.display = 'block';
-                subscribeToMessages();
-                loadExistingMessages();
-            }
-        }
-
-        async function loadExistingMessages() {
-            const { data, error } = await supabaseClient
-                .from('messages')
-                .select('*')
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                console.error('Error loading messages:', error);
-                return;
-            }
-
-            messagesDiv.innerHTML = '';
-            
-            const fragment = document.createDocumentFragment();
-            data.forEach(message => {
-                const messageElement = createMessageElement(message);
-                fragment.appendChild(messageElement);
-            });
-            messagesDiv.appendChild(fragment);
-            
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
-
-        function subscribeToMessages() {
-            if (channel) {
-                channel.unsubscribe();
-            }
-
-            channel = supabaseClient
-                .channel('messages')
-                .on('postgres_changes', 
-                    { event: 'INSERT', schema: 'public', table: 'messages' },
-                    payload => {
-                        const messageElement = createMessageElement(payload.new);
-                        messagesDiv.appendChild(messageElement);
-                        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-                    }
-                )
-                .subscribe();
-        }
-
-        async function sendMessage() {
-            const content = messageInput.value.trim();
-            if (!content) return;
-
-            // Clear input and show message immediately
-            messageInput.value = '';
-            const optimisticMessage = {
-                content,
-                user_name: userName,
-                created_at: new Date().toISOString()
-            };
-            const messageElement = createMessageElement(optimisticMessage);
-            messagesDiv.appendChild(messageElement);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-
-            // Send to Supabase
-            const { error } = await supabaseClient
-                .from('messages')
-                .insert([
-                    { content, user_name: userName }
-                ]);
-
-            if (error) {
-                console.error('Error sending message:', error);
-                messageElement.style.backgroundColor = '#ffebee';
-                return;
-            }
-        }
-
-        function createMessageElement(message) {
-            const messageElement = document.createElement('div');
-            messageElement.className = 'message';
-            
-            const timestamp = new Date(message.created_at).toLocaleTimeString();
-            
-            messageElement.innerHTML = `
-                <span class="user-name">${message.user_name}</span>
-                <span class="timestamp">${timestamp}</span>
-                <div>${message.content}</div>
-            `;
-            
-            return messageElement;
-        }
-
-        // Allow sending message with Enter key
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
+        // 2. NAV PIVOT & SHOOT
+        const navTl = gsap.timeline({
+            scrollTrigger: {
+                trigger: "body",
+                start: "top top",
+                end: "300px top",
+                scrub: true
             }
         });
+
+        // Background Retract & Shoot
+        navTl.to(".nav-bg", { height: "80px", ease: "power2.inOut" }, 0)
+             .to(".nav-bg", { width: "100%", borderRightWidth: "0px", borderBottomWidth: "1px", ease: "power1.in" }, 0.1);
+
+        // Content Shift
+        navTl.to(".content-shift", { marginLeft: "0px", width: "100%", ease: "power1.in" }, 0.1);
+
+        // Logo Movement (Moves UP immediately so it doesn't stay in middle)
+        // Note: 'top' moves from 50% to 40px (center of 80px bar)
+        navTl.to(".nav-logo", {
+            top: "40px", 
+            left: "50%", 
+            rotation: 0,
+            xPercent: -50, 
+            yPercent: -50, 
+            ease: "power2.out" // Faster movement to top
+        }, 0);
+
+        // Coords Movement
+        navTl.to(".nav-coords", {
+            bottom: "auto", top: "40px", left: "auto", right: "3rem",
+            rotation: 0, transform: "translate(0, -50%)", ease: "power2.inOut"
+        }, 0.05);
+
+        // 3. Menu Toggle
+        const menuIcon = document.querySelector('.menu-icon');
+        const menuOverlay = document.querySelector('.menu-overlay');
+        let isMenuOpen = false;
+        menuIcon.addEventListener('click', () => {
+            isMenuOpen = !isMenuOpen;
+            menuIcon.classList.toggle('active');
+            if(isMenuOpen) {
+                gsap.to(menuOverlay, { y: 0, duration: 0.8, ease: "power4.inOut" });
+                lenis.stop();
+            } else {
+                gsap.to(menuOverlay, { y: "-100%", duration: 0.8, ease: "power4.inOut" });
+                lenis.start();
+            }
+        });
+
+        // 4. Intro Animation
+        const intro = gsap.timeline();
+        intro.to('.loader-quote', { opacity: 1, duration: 1.5, ease: "power2.out", delay: 0.5 })
+        .to('.loader-text', { y: 0, duration: 1.2, ease: "power3.out" }, "-=0.5")
+        .to('.loader-quote, .loader-text', { opacity: 0, y: -20, duration: 0.5, delay: 0.5 })
+        .to('.preloader', { yPercent: -100, duration: 1.2, ease: "power4.inOut" })
+        .to('.hero-bg', { scale: 1, opacity: 0.3, duration: 2, ease: "power2.out" }, "-=1")
+        .to('.hero-main span', { y: 0, duration: 1.2, ease: "power3.out" }, "-=0.8")
+        .to('.hero-sur', { opacity: 1, y: 0, duration: 1 }, "-=1")
+        .to('.hero-sub', { opacity: 1, duration: 1 }, "-=0.8");
+
+        // 5. Interactions
+        const cursor = document.querySelector('.cursor');
+        window.addEventListener('mousemove', (e) => { gsap.to(cursor, { x: e.clientX, y: e.clientY, duration: 0.1 }); });
+        document.querySelectorAll('.hover-trig, .product-card, .archive-row').forEach(el => {
+            el.addEventListener('mouseenter', () => cursor.classList.add('grow'));
+            el.addEventListener('mouseleave', () => cursor.classList.remove('grow'));
+        });
+
+        gsap.to('.word', { opacity: 1, stagger: 0.05, scrollTrigger: { trigger: '.manifesto', start: 'top 70%', end: 'bottom 60%', scrub: true } });
+
+        const cards = document.querySelectorAll('.product-card');
+        cards.forEach((card, index) => {
+            if (index < cards.length - 1) {
+                gsap.to(card, { scale: 0.9, opacity: 0, scrollTrigger: { trigger: card, start: "top 5%", end: "bottom 5%", scrub: true, pin: false } });
+            }
+        });
+
+        const floatImg = document.querySelector('.float-img');
+        document.querySelectorAll('.archive-row').forEach(row => {
+            row.addEventListener('mouseenter', () => {
+                floatImg.style.backgroundImage = `url(${row.getAttribute('data-img')})`;
+                gsap.to(floatImg, { opacity: 1, scale: 1, duration: 0.3 });
+            });
+            row.addEventListener('mouseleave', () => gsap.to(floatImg, { opacity: 0, scale: 0.8, duration: 0.3 }));
+            row.addEventListener('mousemove', (e) => gsap.to(floatImg, { x: e.clientX, y: e.clientY, xPercent: 20, yPercent: -50, duration: 0.2 }));
+        });
+
     </script>
 </body>
 </html>
